@@ -1,31 +1,42 @@
+from dotenv import load_dotenv
 from bs4 import BeautifulSoup
-import requests,json,time
+from crawler import get_cases
+from notification.discord_notify import DiscordBot
+from notification.telegram_notify import TelegramBot
+import requests, json, time, os, notification
+import discord, telegram.Updater, line
 
-token = 'kKRfOPZm8fPlxbTuqI05FD8eG7VJJ4PWZPFmT3D6ZOj'
-def lineNotifyMessage(token, msg):
-    headers = {
-        "Authorization": "Bearer " + token, 
-        "Content-Type" : "application/x-www-form-urlencoded"
-    }
-    payload = {'message': msg }
-    r = requests.post("https://notify-api.line.me/api/notify", headers = headers, params = payload)
-    return r.status_code
+def config():
+    global token, filterlist, processedlist, dc_bot, tg_bot
 
-
-with open('filter.json' , 'r', encoding="utf-8") as reader:
-    filterlist = json.loads(reader.read())
-processedlist =  []
-
-
-while(1):
-    res = requests.get('https://www.chickpt.com.tw/cases')
-    soup = BeautifulSoup(res.text,'html.parser')
-    jobs = soup.find("ul", {"id": "job-list"}).find_all('li')
-    for job in jobs:
-        jobsName = job.find("h2", {"class": "ellipsis-job-name"}).text.strip()
-        for filtername in filterlist:
-            if filtername in jobsName and jobsName not in processedlist:
-                processedlist.append(jobsName)
-                lineNotifyMessage(token,jobsName+'\n'+'https://www.chickpt.com.tw/'+job.find("a", {"class": "job-list-item"}).get('href'))
+    load_dotenv()
+    processedlist = []
     
-    time.sleep(600)
+    token = {
+        'line': os.getenv('LINE_NOTIFY_TOKEN'),
+        'telegram': os.getenv('TELEGRAM_BOT_TOKEN'),
+        'discord': os.getenv('DISCORD_BOT_TOKEN')
+    }
+
+    with open('filter.json' , 'r', encoding='utf-8') as reader:
+        filterlist = json.loads(reader.read())
+    
+    dc_bot = DiscordNotify(token['discord'])
+    tg_bot = TelegramNotify(token['telegram'])
+
+def main():
+    while True:
+        cases_list = get_cases(filterlist, processedlist)
+
+        if token.line != '':
+            notification.line_notify.send(token.line, cases_list)
+        if token.telegram != '':
+            tg_bot.send(cases_list)
+        if token.discord != '':
+            dc_bot.send(cases_list)
+
+        sleep(600)
+
+if __name__ == '__main__':
+    config()
+    main()
