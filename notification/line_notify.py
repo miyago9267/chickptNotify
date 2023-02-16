@@ -1,7 +1,7 @@
 from dotenv import load_dotenv
 import requests, json, time, os
 
-def send(token, cases) -> None:
+def send(token, cases) -> int:
     headers = {
         "Authorization": "Bearer " + token, 
         "Content-Type" : "application/x-www-form-urlencoded"
@@ -9,3 +9,4 @@ def send(token, cases) -> None:
     for case in cases:
         payload = {'message': case }
         r = requests.post("https://notify-api.line.me/api/notify", headers = headers, params = payload)
+        return r.status_code
